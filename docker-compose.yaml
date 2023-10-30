@@ -1,0 +1,8 @@
+services:
+  timescaledb:
+    image: docker.io/timescale/timescaledb-ha:pg15-all
+    environment:
+    - POSTGRES_PASSWORD=postgres
+    restart: always
+    ports:
+    - 5432:5432
