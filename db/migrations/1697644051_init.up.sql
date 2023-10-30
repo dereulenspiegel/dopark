@@ -1,6 +1,6 @@
 CREATE TABLE spaces(
     name VARCHAR(256) UNIQUE NOT NULL,
-    coords geometry(Point, 925832) NOT NULL,
+    coords geometry(Point, 25832) NOT NULL,
     number INT PRIMARY KEY
 );
 

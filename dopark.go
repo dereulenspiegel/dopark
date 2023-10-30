@@ -58,7 +58,7 @@ func Scrape() (spaces []Parking, err error) {
 		return nil, fmt.Errorf("failed to parse response from %s: %s", prodEndpoint, err)
 	}
 	for _, feat := range coll.Features {
-		coordinates := geom.NewPoint(geom.XY).MustSetCoords([]float64{feat.Geometry.Coordinates[0], feat.Geometry.Coordinates[1]}).SetSRID(925832)
+		coordinates := geom.NewPoint(geom.XY).MustSetCoords([]float64{feat.Geometry.Coordinates[0], feat.Geometry.Coordinates[1]}).SetSRID(25832)
 		spaces = append(spaces, Parking{
 			Lat:         feat.Geometry.Coordinates[1], // TODO check order of coordinates
 			Lon:         feat.Geometry.Coordinates[0],
