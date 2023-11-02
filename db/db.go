@@ -8,7 +8,6 @@ import (
 
 	doparkscraper "github.com/dereulenspiegel/dopark-scraper"
 	"github.com/jmoiron/sqlx"
-	"github.com/twpayne/go-geom/encoding/ewkb"
 )
 
 type Store struct {
@@ -24,16 +23,25 @@ func NewStore(db *sql.DB, log *slog.Logger) (*Store, error) {
 }
 
 var upsertMetadata = `INSERT INTO spaces(
-	name, coords, number
+	name
 ) VALUES (
-	$1, $2, $3
+	$1
 ) ON CONFLICT(name) DO NOTHING`
 
-func (s *Store) UpsertMetadata(ctx context.Context, parking doparkscraper.Parking) error {
-	_, err := s.db.ExecContext(ctx, upsertMetadata, parking.Name, &ewkb.Point{Point: &parking.Coordinates}, parking.Number)
+var selectId = `SELECT number FROM spaces WHERE name=$1`
+
+func (s *Store) UpsertMetadata(ctx context.Context, parking *doparkscraper.Parking) error {
+	_, err := s.db.ExecContext(ctx, upsertMetadata, parking.Name)
 	if err != nil {
 		return fmt.Errorf("failed to upsert metadata: %s", err)
 	}
+	var id int
+	err = s.db.Get(&id, selectId, parking.Name)
+	if err != nil {
+		s.log.Error("failed to query id", "err", err)
+		return fmt.Errorf("failed to query id: %w", err)
+	}
+	parking.Number = id
 	return nil
 }
 
@@ -50,7 +58,7 @@ var insertValues = `INSERT INTO park_values(
 		NOW()
 	) `
 
-func (s *Store) InsertValues(ctx context.Context, parking doparkscraper.Parking) error {
+func (s *Store) InsertValues(ctx context.Context, parking *doparkscraper.Parking) error {
 	_, err := s.db.NamedExecContext(ctx, insertValues, parking)
 	if err != nil {
 		return fmt.Errorf("failed to insert values: %s", err)

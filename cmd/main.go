@@ -9,8 +9,8 @@ import (
 	"syscall"
 	"time"
 
-	doparkscraper "github.com/dereulenspiegel/dopark-scraper"
 	"github.com/dereulenspiegel/dopark-scraper/db"
+	"github.com/dereulenspiegel/dopark-scraper/geoweb"
 	_ "github.com/lib/pq"
 )
 
@@ -46,6 +46,11 @@ func main() {
 			log.Error("failed to create datastore", "err", err)
 			os.Exit(1)
 		}
+
+		geoScraper, err := geoweb.NewScraper(log)
+		if err != nil {
+			log.Error("failed to create scraper", "err", err)
+		}
 		log.Info("Running scraper with interval", "interval", interval)
 		ticker := time.NewTicker(interval)
 		storeCtx, storeCancel := context.WithCancel(cancelCtx)
@@ -57,7 +62,7 @@ func main() {
 				return
 			case <-ticker.C:
 				log.Debug("starting scrape run")
-				scrapeAndInsert(storeCtx, log, store)
+				scrapeAndInsert(storeCtx, log, geoScraper, store)
 			}
 		}
 
@@ -66,17 +71,18 @@ func main() {
 	log.Info("exiting")
 }
 
-func scrapeAndInsert(ctx context.Context, log *slog.Logger, store *db.Store) {
-	spaces, err := doparkscraper.Scrape()
+func scrapeAndInsert(ctx context.Context, log *slog.Logger, scraper *geoweb.Scraper, store *db.Store) {
+	spaces, err := scraper.Scrape()
 	if err != nil {
 		log.Error("failed to scrape data", "error", err)
 		return
 	}
 	for _, space := range spaces {
-		if err := store.UpsertMetadata(ctx, space); err != nil {
+		if err := store.UpsertMetadata(ctx, &space); err != nil {
 			log.Error("failed to insert metadata", "err", err)
 		}
-		if err := store.InsertValues(ctx, space); err != nil {
+		log.Info("Inserting data", "id", space.Number)
+		if err := store.InsertValues(ctx, &space); err != nil {
 			log.Error("failed to insert values", "err", err)
 		}
 	}
