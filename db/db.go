@@ -5,9 +5,11 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"time"
 
 	doparkscraper "github.com/dereulenspiegel/dopark-scraper"
 	"github.com/jmoiron/sqlx"
+	"github.com/twpayne/go-geom/encoding/ewkb"
 )
 
 type Store struct {
@@ -23,15 +25,15 @@ func NewStore(db *sql.DB, log *slog.Logger) (*Store, error) {
 }
 
 var upsertMetadata = `INSERT INTO spaces(
-	name
+	name, coords
 ) VALUES (
-	$1
+	$1, $2
 ) ON CONFLICT(name) DO NOTHING`
 
 var selectId = `SELECT number FROM spaces WHERE name=$1`
 
 func (s *Store) UpsertMetadata(ctx context.Context, parking *doparkscraper.Parking) error {
-	_, err := s.db.ExecContext(ctx, upsertMetadata, parking.Name)
+	_, err := s.db.ExecContext(ctx, upsertMetadata, parking.Name, &ewkb.Point{Point: parking.Coordinates.SetSRID(4326)})
 	if err != nil {
 		return fmt.Errorf("failed to upsert metadata: %s", err)
 	}
@@ -49,16 +51,21 @@ var insertValues = `INSERT INTO park_values(
 		spaces_id, 
 		free, 
 		total, 
-		time
+		time,
+		updated_at
 	)
 	VALUES(
 		:number, 
 		:free_spaces, 
 		:total_spaces, 
-		NOW()
+		NOW(),
+		:updated_at
 	) `
 
 func (s *Store) InsertValues(ctx context.Context, parking *doparkscraper.Parking) error {
+	if parking.UpdatedAt.IsZero() {
+		parking.UpdatedAt = time.Now()
+	}
 	_, err := s.db.NamedExecContext(ctx, insertValues, parking)
 	if err != nil {
 		return fmt.Errorf("failed to insert values: %s", err)

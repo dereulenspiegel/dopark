@@ -9,10 +9,15 @@ import (
 	"syscall"
 	"time"
 
+	doparkscraper "github.com/dereulenspiegel/dopark-scraper"
 	"github.com/dereulenspiegel/dopark-scraper/db"
-	"github.com/dereulenspiegel/dopark-scraper/geoweb"
+	"github.com/dereulenspiegel/dopark-scraper/opendata"
 	_ "github.com/lib/pq"
 )
+
+type scraper interface {
+	Scrape() (spaces []doparkscraper.Parking, err error)
+}
 
 func main() {
 	sigs := make(chan os.Signal, 1)
@@ -47,10 +52,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		geoScraper, err := geoweb.NewScraper(log)
-		if err != nil {
-			log.Error("failed to create scraper", "err", err)
-		}
+		geoScraper := opendata.NewScraper(log)
 		log.Info("Running scraper with interval", "interval", interval)
 		ticker := time.NewTicker(interval)
 		storeCtx, storeCancel := context.WithCancel(cancelCtx)
@@ -71,7 +73,7 @@ func main() {
 	log.Info("exiting")
 }
 
-func scrapeAndInsert(ctx context.Context, log *slog.Logger, scraper *geoweb.Scraper, store *db.Store) {
+func scrapeAndInsert(ctx context.Context, log *slog.Logger, scraper scraper, store *db.Store) {
 	spaces, err := scraper.Scrape()
 	if err != nil {
 		log.Error("failed to scrape data", "error", err)
